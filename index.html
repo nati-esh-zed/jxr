@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jxr</title>
+    <script src="Cookie.js"></script>
+    <script src="jxr.js"></script>
+</head>
+<script type="text/jxr">
+{skip
+    { theme = Cookie.get('theme') == 'dark' 
+        ? { 'bg': 'dark', 'fg': 'light' }
+        : { 'bg': 'light', 'fg': 'dark' }
+    }
+}
+</script>
+<body class="p-0 m-0">
+    <script type="text/jxr">
+        <header class="px-2 py-1 shadow-{theme.bg}" style="width: 100%; background-color: #916bb8; position: sticky; top: 0; box-sizing: border-box;">
+        {div/class="" style="display: table; width: 100%;"/ 
+            {div/style="display: table-cell; width: 50%;"/ 
+                {h1//Jxr}
+            }
+            {div/style="display: table-cell; width: 50%; text-align: right"/ 
+                <label>Theme</label>
+                <select
+                    class="px-2 py-1 bg-{theme.bg} text-{theme.fg} rounded-sm"
+                    style="font-size: 1em;"
+                    onchange="Cookie.set('theme', this.value); window.location.reload();"
+                    >
+                    <option 
+                        value="light" 
+                        {^Cookie.get('theme') == 'light' ? 'selected' : ''}
+                        >
+                        light
+                    </option>
+                    <option 
+                        value="dark" 
+                        {^Cookie.get('theme') == 'dark' ? 'selected' : ''}
+                        >
+                        dark
+                    </option>
+                </select>
+            }
+        }
+        </header>
+    </script>
+    <script type="text/jxr">
+    <main class="p-2">
+    {scope/'test'/
+        {@document.body.classList.add('body-bg-'+theme.bg)}
+        {@document.body.classList.add('text-'+theme.fg)}
+        {@console.log(scope)}
+        <div id="page-test" class="jxp:panel">
+        {skip/}
+            {#ROW (expr) 
+                <tr>
+                    <td>{code//{b/}{~expr}{/b}}</td>
+                    <td>{code//{{expr}|to_upper_case}}</td>
+                </tr>
+            #}
+            { class_list = 'bg-'+theme.bg+' text-'+theme.fg+' border border-'+theme.bg+' shadow-'+theme.bg+' py-3' }
+            { class_if   = 'bg-'+theme.bg+' text-'+theme.fg+' border border-'+theme.bg+' shadow-'+theme.bg+' p-2 mb-3' }
+        {/skip}
+            <table class="table table-{theme.bg} rounded-md border border-{theme.bg} shadow-{theme.bg} table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Expression</th>
+                        <th>Evaluation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {#ROW(o      := null)}
+                {#ROW(a      := 2)}
+                {#ROW(b      := Math.PI)}
+                {#ROW(c      := a + b)}
+                {#ROW(bar    := { 'foo': 'foo in bar' })}
+                {#ROW((fruits := [ 'apple', 'mango', 'orange' ]))}
+                {#ROW(@console.log('hello from jxr!'))}
+                {#ROW(Math.PI)}
+                {#ROW(o)}
+                {#ROW(a)}
+                {#ROW(b)}
+                {#ROW(c)}
+                {#ROW(a * 3)}
+                {#ROW(d?'default-set')}
+                {#ROW(e:'default-dont-set')}
+                {#ROW(d)}
+                {#ROW(e:)}
+                {#ROW(^document.title = 'hello')}
+                {#ROW(bar)}
+                {#ROW(bar.foo)}
+                {#ROW(fruits)}
+                {#ROW(fruits[1])}
+                </tbody>
+            </table>
+
+            <ul class="list {class_list} rounded-sm">
+            {for fruit of fruits {
+                {li// {fruit}}
+            }}
+            </ul>
+
+            <ol class="list {class_list} rounded-md">
+            {for i in range(3,1,2) {
+                <li>item {i}</li>
+            }}
+            </ol>
+
+            <div class="{class_if} rounded-lg">
+            {if (true) { <div>if (true)</div> }}
+            </div>
+
+            <div class="{class_if} rounded-xl">
+            {for i in range(3) {
+                <div>for:i={i}</div>
+                {if (i == 0) {
+                    <div>if (i == 0)</div>
+                } else if (i == 1) {
+                    <div>else if (i == 1)</div>
+                } else {
+                    <div>else</div>
+                }}
+            }}
+            </div>
+        </div>
+    }
+    </main>
+    </script>
+    <div class="p-2">
+        <script type="text/jxr" src="hello.jxr" async></script>
+        <script type="text/jxr">
+            <p>hello world!</p>
+            <p>hello web-devs!</p>
+        </script>
+    </div>
+    <style>
+        :root {
+            --body-light: #fff;
+            --body-dark: #121212;
+            --light: #f0f0f0;
+            --dark: #344;
+            --light-1: #d7d7d7;
+            --dark-1: #566;
+            --light-2: #e7e7e7;
+            --dark-2: #455;
+            --text-light: #ddd;
+            --text-dark: #333;
+            --text-light-1: #fff;
+            --text-dark-1: #4a5869;
+            --text-light-2: #eee;
+            --text-dark-2: #3e4a59;
+            --border-light: #bbb;
+            --border-dark: #999;
+            --shadow-light: rgb(0 0 0 / 30%);
+            --shadow-dark: rgb(255 255 255 / 50%);
+        }
+        html { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; }
+        .table {
+            border-spacing: 0;
+            width: 100%;
+        }
+        .table tr > th,
+        .table tr > td {
+            text-align: left;
+            padding: .7rem 1rem;
+        }
+        .table.table-light thead tr {
+            background-color: var(--light-1);
+            color: var(--text-dark-1);
+        }
+        .table.table-dark thead tr {
+            background-color: var(--dark-1);
+            color: var(--text-light-1);
+        }
+        .table thead tr > th {
+            font-weight: bold;
+            padding: 1rem;
+        }
+        .table.table-light {
+            background-color: var(--light);
+            color: var(--text-dark);
+        }
+        .table.table-dark {
+            background-color: var(--dark);
+            color: var(--text-light);
+        }
+        .table.table-light tr:not(:last-child) > td { border-bottom: 1px solid var(--border-light); }
+        .table.table-dark tr:not(:last-child) > td  { border-bottom: 1px solid var(--border-dark); }
+        .table.table-light thead tr > th { border-bottom: 1px solid var(--border-light); }
+        .table.table-dark thead tr > th  { border-bottom: 1px solid var(--border-dark); }
+        .table td { padding: 1rem; }
+        .table.table-light tr > th:not(:last-child), 
+        .table.table-light tr > td:not(:last-child) { border-right: 1px solid var(--border-light); }
+        .table.table-dark tr > th:not(:last-child), 
+        .table.table-dark tr > td:not(:last-child)  { border-right: 1px solid var(--border-dark); }
+        .table.table-light.table-striped tr:nth-child(even) { background-color: var(--light-2); color: var(--text-dark-2); }
+        .table.table-dark.table-striped tr:nth-child(even) { background-color: var(--dark-2); color: var(--text-light-2); }
+        .table.table-light.table-hover tr:hover { background-color: var(--light-1); }
+        .table.table-dark.table-hover tr:hover { background-color: var(--dark-1); }
+        .body-bg-light { background-color: var(--body-light); }
+        .body-bg-dark  { background-color: var(--body-dark); }
+        .bg-light      { background-color: var(--light); }
+        .bg-dark       { background-color: var(--dark); }
+        .text-light    { color: var(--text-light); }
+        .text-dark     { color: var(--text-dark); }
+        .border        { border: 1px solid; }
+        .border-light  { border-color: var(--border-light); }
+        .border-dark   { border-color: var(--border-dark); }
+        .shadow-light  { box-shadow: 0px 1px 4px var(--shadow-light); }
+        .shadow-dark   { box-shadow: 0px 1px 4px var(--shadow-dark); }
+        .rounded-sm    { border-radius: .25rem; overflow: hidden; }
+        .rounded-md    { border-radius: .5rem;  overflow: hidden; }
+        .rounded-lg    { border-radius: 1rem;   overflow: hidden; }
+        .rounded-xl    { border-radius: 1.5rem; overflow: hidden; }
+        .p-0  { padding: 0; }
+        .px-0 { padding-left: 0; padding-right: 0; }
+        .py-0 { padding-top: 0; padding-bottom: 0; }
+        .p-1  { padding: .5rem; }
+        .px-1 { padding-left: .5rem; padding-right: .5rem; }
+        .py-1 { padding-top: .5rem; padding-bottom: .5rem; }
+        .p-2  { padding: 1rem; }
+        .px-2 { padding-left: 1rem; padding-right: 1rem; }
+        .py-2 { padding-top: 1rem; padding-bottom: 1rem; }
+        .p-3  { padding: 1.5rem; }
+        .px-3 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .py-3 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+        .m-0  { margin: 0; }
+        .mx-0 { margin-left: 0; margin-right: 0; }
+        .my-0 { margin-top: 0; margin-bottom: 0; }
+        .m-1  { margin: .5rem; }
+        .mx-1 { margin-left: .5rem; margin-right: .5rem; }
+        .my-1 { margin-top: .5rem; margin-bottom: .5rem; }
+        .m-2  { margin: 1rem; }
+        .mx-2 { margin-left: 1rem; margin-right: 1rem; }
+        .my-2 { margin-top: 1rem; margin-bottom: 1rem; }
+        .m-3  { margin: 1.5rem; }
+        .mx-3 { margin-left: 1.5rem; margin-right: 1.5rem; }
+        .my-3 { margin-top: 1.5rem; margin-bottom: 1.5rem; }
+        .mb-3 { margin-bottom: 1rem; }
+        .overflow-auto   { overflow: auto; }
+        .overflow-scroll { overflow: scroll; }
+        .overflow-hidden { overflow: hidden; }
+    </style>
+</body>
+</html>
