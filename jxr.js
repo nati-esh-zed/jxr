@@ -1,12 +1,13 @@
 
 /**
  * @name jxr
- * @version 1.2.5
+ * @version 1.4.10
  * @author Natnael Eshetu
  * @abstract Replaces script elements of type "text/jxr" 
  *           with the formatted html. 
  * @summary
- *  {...} -- }{ cannot exist inside {} unless it is in string quotes.
+ *  {...} -- }{ cannot exist inside {} unless it is in string quotes
+ *  or escaped with \.
  * 
  * @example
  * 
@@ -17,7 +18,6 @@
  *          {a=1}{b=2}{c=a+b}{c}
  *          {d?'default-set'}
  *          {e:'default-dontset'}
- *          {document.title = 'hello'}
  *          {^document.title = 'hello'}
  *      {/skip}
  *          {!console.log('hello')}
@@ -30,6 +30,32 @@
 
 let jxr = {
     vars: {
+        var_exists: function(root_id, id)
+        {
+            if(!id || id == '')
+                return false;
+            if(!!root_id)
+                root_id = root_id.trim();
+            const di = id.indexOf('.');
+            if(di != -1)
+            {
+                const cid = id.substring(0, di);
+                const lid = id.substring(di + 1);
+                const tid = !!root_id && root_id != '' 
+                    ? (root_id+'.'+cid)
+                    : cid;
+                return eval('typeof '+tid+' !== "undefined"')
+                    && jxr.vars.var_exists(tid, lid);
+            }
+            else
+            {
+                const tid = !!root_id && root_id != '' 
+                    ? (root_id+'.'+id)
+                    : id;
+                return eval('typeof '+tid+' !== "undefined"');
+            }
+            return false;
+        },
         range: function(count, start, step)
         {
             return { 
@@ -40,12 +66,12 @@ let jxr = {
         }
     },
     macros: {},
-    process: function(script, shtml, script_src_, script_id_)
+    process: function(__script, __shtml, __script_src_, __script_id_)
     {
-        let skip_indices = [];
-        let html = null;
-        let script_id  = '';
-        let script_src = '';
+        let __skip_indices = [];
+        let __html         = null;
+        let __script_id    = '';
+        let __script_src   = '';
         {
             const strvar = function(var_)
             {
@@ -61,16 +87,16 @@ let jxr = {
                     return JSON.stringify(var_);
                 return ''+var_;
             };
-            const jxr_error = function(err, shtml, offset, script_id, log_line_numbered_code)
+            const jxr_error = function(err, __shtml, __offset, __script_id, __log_line_numbered_code)
             {
-                const script_substr = shtml.substring(Math.max(offset-1, 0), Math.min(offset+name.length+3, shtml.length));
-                const line = (shtml.substring(0, offset+1).match(/\n/g) || []).length+1;
-                const offs = offset - shtml.lastIndexOf("\n", offset);
-                if(log_line_numbered_code)
+                const script_substr = __shtml.substring(Math.max(__offset-1, 0), Math.min(__offset+17, __shtml.length));
+                const line = (__shtml.substring(0, __offset+1).match(/\n/g) || []).length+1;
+                const offs = __offset - __shtml.lastIndexOf("\n", __offset);
+                if(__log_line_numbered_code)
                 {
                     let l = 1;
                     const maxpad = 3;
-                    schtml = ' '.repeat(maxpad-1)+'1:'+shtml;
+                    schtml = ' '.repeat(maxpad-1)+'1:'+__shtml;
                     console.error(schtml.replaceAll("\n", function(match)
                     {
                         const lstr = ''+(++l);
@@ -78,146 +104,149 @@ let jxr = {
                         return "\n"+pad+lstr+':';
                     }));
                 }
-                return EvalError(err+' @'+script_id+':'+line+':'+offs+' -- `'+script_substr+'`');
+                return EvalError(err+' @'+__script_id+':'+line+':'+offs+' -- `'+script_substr+'`');
             };
-            const replace_value_vars = function(value)
+            let __skip_start_i  = null;
+            let __last_i        = 0;
+            let __res_i         = 0;
+            let __log_line_numbered_code = false;
+            if(!!__script)
             {
-                if(value.search(/^\s*\\[}{}]/gs) != -1)
+                if(__script instanceof HTMLScriptElement)
                 {
-                    let rvalue = value.replaceAll(/\\([}{}])/gs, '$1');
-                    return rvalue.trim();
-                }
-                else
-                {
-                    let rvalue = value.replaceAll(/(?:(['"])(?:\\\1|.)*\1|([\w\.]+))/gs, function(match_, p1, p2)
-                    {
-                        if(!p2 || p2 == '\'' || p2 == '"')
-                            return match_;
-                        else if(match_ == 'null' || match_ == 'undefined')
-                            return match_;
-                        else if(p2.indexOf('.') != -1)
-                        {
-                            return eval(match_);
-                        }
-                        else
-                        {
-                            if(jxr.vars.hasOwnProperty(p2))
-                                return 'jxr.vars.'+p2;
-                            else if(eval('!!'+p2))
-                                return p2;
-                            else
-                                throw EvalError('variable `'+p2+'` is not defined.');
-                        }
-                    });
-                    return rvalue;
-                }
-            };
-            let skip_start_i  = null;
-            let last_i        = 0;
-            let res_i         = 0;
-            let log_line_numbered_code = false;
-            if(!!script)
-            {
-                if(script instanceof HTMLScriptElement)
-                {
-                    const attr_id   = script.getAttribute('id') || script_id_;
-                    const attr_src  = script.getAttribute('src') || script_src_;
+                    const attr_id   = __script.getAttribute('id') || __script_id_;
+                    const attr_src  = __script.getAttribute('src') || __script_src_;
                     if(!!attr_id)
-                        script_id =  attr_id;
+                        __script_id =  attr_id;
                     else if(!!attr_src)
                     {
-                        script_id =  attr_src;
-                        script_src = attr_src;
+                        __script_id =  attr_src;
+                        __script_src = attr_src;
                     }
-                    log_line_numbered_code = !attr_src;
+                    __log_line_numbered_code = !attr_src;
                 }
-                else if(script instanceof Object)
+                else if(__script instanceof Object)
                 {
-                    script_id = script.script_id+'/'+script.type+' `'+script.name+'`';
-                    log_line_numbered_code = true;
+                    __script_id = __script.script_id+'/'+__script.type+' `'+__script.name+'`';
+                    __log_line_numbered_code = true;
                 }
             }
             // remove comments
-            shtml = shtml.replaceAll(/\{\*(\\[}{]|.)*?\*\}/gs, '');
-            // process and remove macro definitions
-            shtml = shtml.replaceAll(/\{#\s*(\w+)\s*\(\s*((?:(?:\w+)\s*,?\s*)*)\s*\)(?:\s*\n|\s?)(.*?)(?:\n\s*|\s?)#\}/gs, function(match_, p1, p2, p3, offset)
+            __shtml = __shtml.replaceAll(/\{\*(\\[}{]|.)*?\*\}/gs, '');
+            // process and remove __macro definitions
+            __shtml = __shtml.replaceAll(/\{#\s*(\w+)\s*\(\s*((?:(?:\w+)\s*,?\s*)*)\s*\)\s*\n?(.*?)\n?\s*#\}/gs, function(__match, __p1, __p2, __p3, __offset)
             {
-                const name   = p1;
-                if(typeof jxr.macros[name] !== 'undefined')
-                    throw jxr_error('Macro previously defined!', shtml, offset, script_id, log_line_numbered_code);
-                const params = p2.split(/\s*,\s*/gs);
-                const body   = p3.replaceAll(/\{\s*(?:(\w+)|#(\w+))?\s*\}/gs, function(match_, p1, p2)
+                const __name   = __p1;
+                if(typeof jxr.macros[__name] !== 'undefined')
+                    throw jxr_error('Macro previously defined!', __shtml, __offset, __script_id, __log_line_numbered_code);
+                const __params = __p2.split(/\s*,\s*/gs);
+                const __body   = __p3.replaceAll(/\{\s*(?:(\w+)|#(\w+))?\s*\}/gs, function(__match, __p1, __p2)
                 {
                     let pi = -1;
-                    if(!!p1 && (pi = params.indexOf(p1)) != -1)
+                    if(!!__p1 && (pi = __params.indexOf(__p1)) != -1)
                     {
-                        return '{#'+p1+'}';
+                        return '{#'+__p1+'}';
                     }
-                    else if(!!p2 && (pi = params.indexOf(p2)) != -1)
+                    else if(!!__p2 && (pi = __params.indexOf(__p2)) != -1)
                     {
-                        return '{~'+p2+'}';
+                        return '{~'+__p2+'}';
                     }
-                    return match_;
+                    return __match;
                 });
-                jxr.macros[name] = {
-                    type:       'macro',
-                    script_id:  script_id,
-                    script_src: script_src,
-                    name:       name,
-                    params:     params,
-                    body:       body
+                jxr.macros[__name] = {
+                    type:       '__macro',
+                    script_id:  __script_id,
+                    script_src: __script_src,
+                    name:       __name,
+                    params:     __params,
+                    body:       __body
                 };
                 return '';
             });
-            html  = shtml.replaceAll(/\{\s*((?:\\[}{]|.)*?)\}/gs, function(match_, p1, offset)
+            __html  = __shtml.replaceAll(/\{\s*((?:\\[}{]|.)*?)\}/gs, function(__match, __p1, __offset)
             {
-                res_i  += offset - last_i;
-                last_i  = offset + match_.length;
-                let res = '';
-                const expr = p1;
-                const rstrmap = {
+                const validate_value_vars = function(__value)
+                {
+                    if(!__value)
+                        return '';
+                    if(__value.search(/^\s*\\[}{}]/gs) != -1)
+                    {
+                        let rvalue = __value.replaceAll(/\\([}{}])/gs, '$1');
+                        return rvalue.trim();
+                    }
+                    else
+                    {
+                        let rvalue = __value.replaceAll(/(?:(['"])(?:\\\1|.)*\1|(true|false|null|undefined|\d+)|([a-zA-Z_][\w\.]*))/gs, function(__match, __p1, __p2, __p3)
+                        {
+                            if(!!__p1 || !!__p2)
+                                return __match;
+                            else if(__match == 'null' || __match == 'undefined')
+                                return __match;
+                            else
+                            {
+                                const robj = __p3.substring(0, __p3.indexOf('.'));
+                                if(jxr.vars.var_exists('jxr.vars', __p3))
+                                    return ('jxr.vars.'+__p3);
+                                else if(jxr.vars.var_exists(null, __p3))
+                                    return (__p3);
+                                else
+                                    throw jxr_error('variable `'+__p3+'` is not defined.', __shtml, __offset, __script_id, __log_line_numbered_code);
+                            }
+                        });
+                        return rvalue;
+                    }
+                };
+                __res_i       += __offset - __last_i;
+                __last_i       = __offset + __match.length;
+                let   __result = '';
+                const __expr   = __p1;
+                const rstrmap  = {
                     '|nl':   "\n",
                     '|tab':  "\t",
+                    '|c':    ":",
+                    '|bo':    "{",
+                    '|bc':    "}",
                     'b/':    "{",
                     '/b':    "}",
                 };
-                if(!expr || expr == '')
+                if(!__expr || __expr == '')
                 {
                 }
-                else if(rstrmap.hasOwnProperty(expr))
+                else if(rstrmap.hasOwnProperty(__expr))
                 {
-                    res = rstrmap[expr];
+                    __result = rstrmap[__expr];
                 }
-                else if(expr == 'skip/')
+                else if(__expr == 'skip/')
                 {
-                    skip_start_i = res_i;
+                    __skip_start_i = __res_i;
                 }
-                else if(expr == '/skip')
+                else if(__expr == '/skip')
                 {
-                    if(skip_start_i != null)
+                    if(__skip_start_i != null)
                     {
-                        const skip_end_i = res_i;
-                        skip_indices.push({
-                            start:  skip_start_i, 
+                        const skip_end_i = __res_i;
+                        __skip_indices.push({
+                            start:  __skip_start_i, 
                             end:    skip_end_i,
                         });
-                        skip_start_i = null;
+                        __skip_start_i = null;
                     }
                 }
-                else if(expr.search(/^for\s+.*/gs) != -1)
+                else if(__expr.search(/^for\s+.*/gs) != -1)
                 {
-                    const rexpr   = expr.replaceAll(/\\([}{])/gs, '$1');
-                    const matches = /for (\w+)\s+in\s+(.*?)\s*\:(?:\s*\n|\s?)(.*?)(?:\s*\n\s*|\s*)$/gs.exec(rexpr);
-                    if(!!matches && matches.length >= 3)
+                    const __rexpr   = __expr.replaceAll(/\\([}{])/gs, '$1');
+                    const __matches = /for (\w+)\s+in\s+(.*?)\s*\:\s*?\n?(.+?\n?)\s*$/gs.exec(__rexpr);
+                    if(!!__matches && __matches.length >= 3)
                     {
-                        const iname   = matches[1];
-                        const ivar    = eval(replace_value_vars(matches[2]));
-                        const icode   = matches[3];
+                        const iname   = __matches[1];
+                        const ivar    = eval(validate_value_vars(__matches[2]));
+                        const icode   = __matches[3];
                         const itmp    = jxr.vars[iname];
                         let cresult = '';
                         if(!ivar)
-                            throw jxr_error('invalid for loop iterable variable!', shtml, offset, script_id, log_line_numbered_code);
-                        if(typeof ivar.start != 'undefined' 
+                            throw jxr_error('invalid for loop iterable variable!', __shtml, __offset, __script_id, __log_line_numbered_code);
+                        if(ivar instanceof Object
+                        && typeof ivar.start != 'undefined' 
                         && typeof ivar.count != 'undefined'
                         && typeof ivar.step != 'undefined'
                         )
@@ -230,10 +259,10 @@ let jxr = {
                                 jxr.vars[iname] = i;
                                 const result = jxr.process({
                                     type: 'for-loop',
-                                    script_id: script_id,
-                                    script_src: script_src,
-                                    name: 'for',
-                                    body: rexpr,
+                                    __script_id: __script_id,
+                                    __script_src: __script_src,
+                                    __name: 'for',
+                                    __body: __rexpr,
                                 }, icode);
                                 cresult += result;
                             }
@@ -245,232 +274,280 @@ let jxr = {
                                 jxr.vars[iname] = it;
                                 const result = jxr.process({
                                     type: 'for-loop',
-                                    script_id: script_id,
-                                    script_src: script_src,
-                                    name: 'for',
-                                    body: rexpr,
+                                    __script_id: __script_id,
+                                    __script_src: __script_src,
+                                    __name: 'for',
+                                    __body: __rexpr,
                                 }, icode);
                                 cresult += result;
                             }
                         }
                         if(itmp !== undefined)
                             jxr.vars[iname] = itmp;
-                        res = cresult;
+                        __result = cresult;
                     }
                     else 
-                        throw jxr_error('invalid for loop code!', shtml, offset, script_id, log_line_numbered_code);
+                        throw jxr_error('invalid for loop __code!', __shtml, __offset, __script_id, __log_line_numbered_code);
                 }
-                else if(expr.search(/^#\s*\w+\s*\(\s*.*?\s*\)\s*/gs) != -1)
+                else if(__expr.search(/^if\s+.*/gs) != -1)
                 {
-                    const matches = /\s*(\w+)\s*\(\s*(.*?)\s*\)\s*/gs.exec(expr);
-                    const name    = matches[1];
-                    const params  = matches[2].split(/\s*,\s*/gs);
-                    if(typeof jxr.macros[name] === 'undefined')
-                        throw jxr_error('Macro not defined!', shtml, offset, script_id, log_line_numbered_code);
+                    const __rexpr   = __expr.replaceAll(/\\([}{])/gs, '$1');
+                    const __matches = /(?:(?:if|\:elseif)\s+(.*?)\s*\:(.*?))+(?:\:\s*else\s*\:(.*?))?/gs.exec(__rexpr);
+                    if(!!__matches && __matches.length >= 1)
+                    {
+                        try  {
+                            const if_cond = {
+                                type: 'if-condition',
+                                __script_id: __script_id,
+                                __script_src: __script_src,
+                                __name: 'if',
+                                __body: __rexpr,
+                            };
+                            let if_state = 0;
+                            const result = __rexpr.replaceAll(/(?:(?:(elseif|if)\s+)(.*?)\:\s*\n?(.+?\n?)\s*(\:|$)|(else)\s*\:\s*\n?(.+?\n?)\s*$)/gs, function(__match, ...args)
+                            {
+                                if(if_state == 0) // if
+                                {
+                                    const condition = args[1];
+                                    const __code      = args[2];
+                                    const condval   = eval(validate_value_vars(condition));
+                                    if(condval)
+                                    {
+                                        __result = jxr.process(if_cond, __code);
+                                        throw 0;
+                                    }
+                                    if_state = 1;
+                                }
+                                else if(if_state == 1 || if_state == 2) // else-if or else
+                                {
+                                    if(args[0] == 'elseif')
+                                    {
+                                        const condition = args[1];
+                                        const __code      = args[2];
+                                        const condval   = eval(validate_value_vars(condition));
+                                        if(condval)
+                                        {
+                                            __result = jxr.process(if_cond, __code);
+                                            throw 0;
+                                        }
+                                        if_state = 2;
+                                    }
+                                    else if(args[4] == 'else')
+                                    {
+                                        const __code = args[5];
+                                        __result = jxr.process(if_cond, __code);
+                                        if_state = 3;
+                                        throw 0;
+                                    }
+                                    else
+                                        throw jxr_error('expecting `elseif` or `else`!', __shtml, __offset, args[args.length-2], __log_line_numbered_code);
+                                }
+                                else
+                                {
+                                    throw jxr_error('expecting end of block!', __shtml, __offset, args[args.length-2], __log_line_numbered_code);
+                                }
+                                return '';
+                            });
+                        }
+                        catch(e)
+                        {
+                            if(typeof(e) != 'number')
+                                throw e;
+                        }
+                    }
+                    else 
+                        throw jxr_error('invalid if-condition __code!', __shtml, __offset, __script_id, __log_line_numbered_code);
+                }
+                else if(__expr.search(/^#\s*\w+\s*\(\s*.*?\s*\)\s*/gs) != -1)
+                {
+                    const __matches = /\s*(\w+)\s*\(\s*(.*?)\s*\)\s*/gs.exec(__expr);
+                    const __name    = __matches[1];
+                    const __params  = __matches[2].split(/\s*,\s*/gs);
+                    if(typeof jxr.macros[__name] === 'undefined')
+                        throw jxr_error('Macro not defined!', __shtml, __offset, __script_id, __log_line_numbered_code);
                     else
                     {
-                        const macro  = jxr.macros[name];
-                        if(params.length !== macro.params.length)
-                            throw jxr_error('Macro params mismatch!', shtml, offset, script_id, log_line_numbered_code);
-                        const body   = macro.body.replaceAll(/\{(?:#(\w+)|~(\w+))\}/gs, function(match_, p1, p2)
+                        const __macro  = jxr.macros[__name];
+                        if(__params.length !== __macro.params.length)
+                            throw jxr_error('Macro params mismatch!', __shtml, __offset, __script_id, __log_line_numbered_code);
+                        const __body   = __macro.body.replaceAll(/\{(?:#(\w+)|~(\w+))\}/gs, function(__match, __p1, __p2)
                         {
-                            if(!!p2)
+                            if(!!__p2)
                             {
-                                const pi     = macro.params.indexOf(p2);
-                                const pname  = params[pi];
+                                const pi     = __macro.params.indexOf(__p2);
+                                const pname  = __params[pi];
                                 return pname;
                             }
                             else
                             {
-                                const pi   = macro.params.indexOf(p1);
-                                const pvar = '{'+params[pi]+'}';
+                                const pi   = __macro.params.indexOf(__p1);
+                                const pvar = '{'+__params[pi]+'}';
                                 return pvar;
                             }
                         });
-                        res  = jxr.process(macro, body, script_src, script_id);
+                        __result  = jxr.process(__macro, __body, __script_src, __script_id);
                     }
                 }
-                else if(expr.search(/^\!.*$/gs) != -1)
+                else if(__expr.search(/^\!.*$/gs) != -1)
                 {
-                    const r = /^\!(.*)$/gs;
-                    const spexpr = r.exec(expr);
-                    const code   = spexpr[1].replaceAll(/\\([}{])/gs, '$1');
-                    eval(code);
+                    const __r = /^\!(.*)$/gs;
+                    const __spexpr = __r.exec(__expr);
+                    const __code   = __spexpr[1].replaceAll(/\\([}{])/gs, '$1');
+                    eval(__code);
                 }
-                else if(expr.search(/^\^.*$/gs) != -1)
+                else if(__expr.search(/^\^.*$/gs) != -1)
                 {
-                    const r = /^\^(.*)$/gs;
-                    const spexpr = r.exec(expr);
-                    const code   = spexpr[1].replaceAll(/\\([}{])/gs, '$1');
-                    res = strvar(eval(code));
+                    const __r = /^\^(.*)$/gs;
+                    const __spexpr = __r.exec(__expr);
+                    const __code   = __spexpr[1].replaceAll(/\\([}{])/gs, '$1');
+                    __result = strvar(eval(__code));
                 }
-                else if(expr.search(/^\s*[\w\.]+\s*=\s*.+\s*$/gs) != -1)
+                else if(__expr.search(/^\s*[a-zA-Z_][\w\.]*\s*=\s*.+\s*$/gs) != -1)
                 {
-                    const r = /^\s*([\w\.]+)\s*=\s*(.+)\s*$/gs;
-                    const spexpr = r.exec(expr);
-                    const name   = spexpr[1];
-                    const value  = spexpr[2];
-                    let   cvalue = replace_value_vars(value);
-                    if(cvalue.search(/\s*\{.*\}\s*/gs) != -1)
+                    const __r = /^\s*([a-zA-Z_][\w\.]*)\s*=\s*(.+)\s*$/gs;
+                    const __spexpr = __r.exec(__expr);
+                    const __name   = __spexpr[1];
+                    const __value  = __spexpr[2];
+                    let   __cvalue = validate_value_vars(__value);
+                    if(__cvalue.search(/\s*\{.*\}\s*/gs) != -1)
                     {
-                        cvalue = cvalue.replaceAll(/(?:(?:".*?")|(\w+))/gs, function(match_, p1)
+                        __cvalue = __cvalue.replaceAll(/(?:(?:".*?")|(\w+))/gs, function(__match, __p1)
                         {
-                            if(!!p1 && p1 != '')
+                            if(!!__p1 && __p1 != '')
                             {
-                                if(jxr.vars.hasOwnProperty(p1))
-                                    return jstrvar(eval('jxr.vars.'+p1));
-                                else if(eval('typeof '+p1+' !== \'undefined\''))
-                                    return jstrvar(eval(p1));
+                                const __name = __p1;
+                                if(jxr.vars.var_exists('jxr.vars', __name))
+                                    return jstrvar(eval('jxr.vars.'+__name));
+                                else if(jxr.vars.var_exists(null, __name))
+                                    return jstrvar(eval(__name));
                                 else
-                                    throw EvalError('variable `'+p1+'` is not defined.');
+                                    throw jxr_error('variable `'+__name+'` not defined.', __shtml, __offset, __script_id, __log_line_numbered_code);
                             }
                             else
-                                return match_;
+                                return __match;
                         });
-                        jxr.vars[name] = JSON.parse(cvalue);
-                    }
-                    else
-                        jxr.vars[name] = eval(cvalue);
-                }
-                else if(expr.search(/^\s*[\w\.]+\s*\?\s*.*\s*$/gs) != -1)
-                {
-                    const r = /^\s*([\w\.]+)\s*\?\s*(.*)\s*$/gs;
-                    const spexpr = r.exec(expr);
-                    const name   = spexpr[1];
-                    const dvalue = spexpr[2];
-                    if(!jxr.vars.hasOwnProperty(name))
-                    {
-                        if(dvalue == '')
-                        {
-                            res = 'undefined';
-                        }
-                        else
-                        {
-                            const cvalue   = replace_value_vars(dvalue);
-                            jxr.vars[name] = eval(cvalue);
-                            res = strvar(jxr.vars[name]);
-                        }
-                    }
-                    else 
-                        res = strvar(jxr.vars[name]);
-                }
-                else if(expr.search(/^\s*[\w\.]+\s*\:\s*.*\s*$/gs) != -1)
-                {
-                    const r = /^\s*([\w\.]+)\s*\:\s*(.*)\s*$/gs;
-                    const spexpr = r.exec(expr);
-                    const name   = spexpr[1];
-                    const dvalue = spexpr[2];
-                    if(!jxr.vars.hasOwnProperty(name))
-                    {
-                        if(dvalue == '')
-                        {
-                            res = 'undefined';
-                        }
-                        else
-                        {
-                            const cvalue = replace_value_vars(dvalue);
-                            res = eval(cvalue);
-                        }
-                    }
-                    else 
-                        res = strvar(jxr.vars[name]);
-                }
-                else if(expr.search(/^\s*([\w\.]+)\s*$/g) != -1)
-                {
-                    const name = expr.trim();
-                    if(name.indexOf('.') != -1)
-                    {
-                        let ids  = name.split('.');
-                        let rvar = ids[0];
-                        if(jxr.vars.hasOwnProperty(rvar))
-                            rvar = 'jxr.vars.'+rvar;
-                        else if(eval('typeof '+rvar+' !== \'undefined\''))
-                            rvar = rvar;
-                        else 
-                        {
-                            throw jxr_error('variable `'+name+'` is not defined!', shtml, offset, script_id, log_line_numbered_code);
-                        }
-                        for(let i = 1; i < ids.length; i++)
-                        {
-                            rvar += '.'+ids[i];
-                        }
-                        res = strvar(eval(rvar));
+                        const __assign_code = 'jxr.vars.'+__name+' = JSON.parse(__cvalue)';
+                        eval(__assign_code);
                     }
                     else
                     {
-                        if(jxr.vars.hasOwnProperty(name))
-                            res = strvar(jxr.vars[name]);
-                        else if(eval('typeof '+name+' !== \'undefined\''))
-                            res = strvar(eval(name));
-                        else 
+                        const __assign_code = 'jxr.vars.'+__name+' = eval(__cvalue)';
+                        eval(__assign_code);
+                    }
+                }
+                else if(__expr.search(/^\s*[a-zA-Z_][\w\.]*\s*\?\s*.*\s*$/gs) != -1)
+                {
+                    const __r = /^\s*([a-zA-Z_][\w\.]*)\s*\?\s*(.*)\s*$/gs;
+                    const __spexpr = __r.exec(__expr);
+                    const __name   = __spexpr[1];
+                    const dvalue = __spexpr[2];
+                    if(jxr.vars.var_exists('jxr.vars', __name))
+                        __result = strvar(eval('jxr.vars.'+__name));
+                    else if(jxr.vars.var_exists(null, __name))
+                        __result = strvar(eval(__name));
+                    else
+                    {
+                        if(dvalue == '')
+                            __result = 'undefined';
+                        else
                         {
-                            throw jxr_error('variable `'+name+'` is not defined!', shtml, offset, script_id, log_line_numbered_code);
+                            const __cvalue      = validate_value_vars(dvalue);
+                            const __assign_code = 'jxr.vars.'+__name+' = '+__cvalue;
+                            __result = strvar(eval(__assign_code));
                         }
                     }
+                }
+                else if(__expr.search(/^\s*[a-zA-Z_][\w\.]*\s*\:\s*.*\s*$/gs) != -1)
+                {
+                    const __r = /^\s*([a-zA-Z_][\w\.]*)\s*\:\s*(.*)\s*$/gs;
+                    const __spexpr = __r.exec(__expr);
+                    const __name   = __spexpr[1];
+                    const __dvalue = __spexpr[2];
+                    if(jxr.vars.var_exists('jxr.vars', __name))
+                        __result = strvar(eval('jxr.vars.'+__name));
+                    else if(jxr.vars.var_exists(null, __name))
+                        __result = strvar(eval(__name));
+                    else
+                    {
+                        if(__dvalue == '')
+                            __result = 'undefined';
+                        else
+                        {
+                            const __cvalue = validate_value_vars(__dvalue);
+                            __result = strvar(eval(__cvalue));
+                        }
+                    }
+                }
+                else if(__expr.search(/^\s*([a-zA-Z_][\w\.]*)\s*$/g) != -1)
+                {
+                    const __name = __expr;
+                    if(jxr.vars.var_exists('jxr.vars', __name))
+                        __result = strvar(eval('jxr.vars.'+__name));
+                    else if(jxr.vars.var_exists(null, __name))
+                        __result = strvar(eval(__name));
+                    else 
+                        throw jxr_error('variable `'+__name+'` is not defined!', __shtml, __offset, __script_id, __log_line_numbered_code);
                 }
                 else
                 {
-                    let rexpr = expr.replaceAll(/\s*(?:(?=[^\.]\w*)(\w+)|([\w\.]+))\s*/g, function(match_, p1)
+                    let __rexpr = __expr.replaceAll(/([a-zA-Z_][\w\.]*)/g, function(__match, __p1)
                     {
-                        if(p1.indexOf('.') != -1)
-                        {
-                            return match_;
-                        }
-                        else
-                        {
-                            if(jxr.vars.hasOwnProperty(p1))
-                                return 'jxr.vars.'+p1;
-                            else if(eval('typeof '+p1+' !== \'undefined\''))
-                                return p1;
-                            else
-                                throw jxr_error('variable `'+p1+'` not defined.', shtml, offset, script_id, log_line_numbered_code);
-                        }
+                        const __name = __p1;
+                        if(jxr.vars.var_exists('jxr.vars', __name))
+                            return 'jxr.vars.'+__name;
+                        else if(jxr.vars.var_exists(null, __name))
+                            return __name;
+                        else 
+                            throw jxr_error('variable `'+__name+'` is not defined!', __shtml, __offset, __script_id, __log_line_numbered_code);
                     });
-                    res = strvar(eval(rexpr));
+                    __result = strvar(eval(__rexpr));
                 }
-                res_i += res.length;
-                return res;
+                __res_i += __result.length;
+                return __result;
             });
         }
         // remove skip blocks
         let thtml  = '';
         {
-            const is_space = function(ch) { return (ch == ' ' || ch == "\t" || ch == "\v" || ch == "\r"); };
-            let last_i = 0;
-            for(let skip_index of skip_indices)
+            const is_space = function(ch) { return (ch == ' ' || ch == "\t" || ch == "\v" || ch == "\__r"); };
+            let __last_i = 0;
+            for(let skip_index of __skip_indices)
             {
                 let start_i = skip_index.start;
                 let end_i   = skip_index.end;
-                for(start_i--; start_i > last_i; start_i--)
+                for(start_i--; start_i > __last_i; start_i--)
                 {
-                    const ch = html.charAt(start_i);
-                    if(!is_space(ch))
+                    const ch = __html.charAt(start_i);
+                    if(ch == "\n" || !is_space(ch))
+                    {
+                        start_i++;
+                        break;
+                    }
+                }
+                for(; end_i < __html.length; end_i++)
+                {
+                    const ch = __html.charAt(end_i);
+                    if(ch == "\n" || !is_space(ch))
                         break;
                 }
-                for(; end_i < html.length; end_i++)
-                {
-                    const ch = html.charAt(end_i);
-                    if(!is_space(ch))
-                        break;
-                }
-                thtml  += html.substring(last_i, start_i);
-                last_i  = end_i + 1;
+                thtml  += __html.substring(__last_i, start_i);
+                __last_i  = end_i + 1;
             }
-            if(last_i < html.length)
+            if(__last_i < __html.length)
             {
-                thtml += html.substring(last_i);
+                thtml += __html.substring(__last_i);
             }
         }
-        // replace the script tag with the processed output
-        if(typeof script == 'string')
+        // replace the __script tag with the processed output
+        if(typeof __script == 'string')
         {
             return thtml;
         }
-        else if(script instanceof HTMLScriptElement)
+        else if(__script instanceof HTMLScriptElement)
         {
             let e =  null;
-            const r = /^\s*<([a-zA-Z]+)(.*?)>(.*)<\/\1>\s*$/gs;
-            rxhtml  = r.exec(thtml);
+            const __r = /^\s*<([a-zA-Z]+)(.*?)>(.*)<\/\1>\s*$/gs;
+            rxhtml  = __r.exec(thtml);
             if(!!rxhtml && rxhtml.length >= 3)
             {
                 const tag         = rxhtml[1];
@@ -498,13 +575,13 @@ let jxr = {
             else
             {
                 e = document.createElement('div');
-                if(!!script_id && script_id != '')
-                    e.setAttribute('id', script_id);
+                if(!!__script_id && __script_id != '')
+                    e.setAttribute('id', __script_id);
                 e.innerHTML = thtml;
             }
-            script.replaceWith(e);
+            __script.replaceWith(e);
         }
-        else if(script instanceof Object) // macro
+        else if(__script instanceof Object) // __macro
         {
             return thtml;
         }

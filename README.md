@@ -28,6 +28,7 @@ custom HTML script(type='text/jxr') parser for better design.
     { c         = a + b }
     { bar       = \{ "foo": "foo in bar" \} }
     { fruits    = [ 'apple', 'mango', 'orange' ] }
+    {! console.log('hello from jxr!')}
   {/skip}
   {#ROW(Math.PI)}
   {#ROW(o)}
@@ -35,18 +36,17 @@ custom HTML script(type='text/jxr') parser for better design.
   {#ROW(b)}
   {#ROW(c)}
   {#ROW(d?'default-set')}
-  {#ROW(e:'default-dontset')}
+  {#ROW(e:'default-dont-set')}
   {#ROW(d)}
   {#ROW(e:)}
-  {#ROW(document.title = 'hello')}
-  {#ROW(document.title = 'hello')}
+  {#ROW(^document.title = 'hello')}
   {#ROW(bar)}
   {#ROW(bar.foo)}
   {#ROW(fruits)}
   {#ROW(fruits[1])}
   <ul>
   {for fruit in fruits:
-    <li>item \{fruit\}</li>\{|nl\}
+    <li>\{fruit\}</li>\{|nl\}
   }
   </ul>
   <ol>
@@ -54,6 +54,20 @@ custom HTML script(type='text/jxr') parser for better design.
     <li>item \{i\}</li>
   }
   </ol>
+  {i = 1}
+  {if true: <p>if-true-0</p> }        
+  {if i == 0:
+    <p>if-i-1</p>
+  :else:
+    <p>else-i-1</p>
+  }
+  {if i == 0:
+    <p>if-i-2</p>
+  :elseif i == 1:
+    <p>elseif-i-2</p>
+  :else:
+    <p>else-i-2</p>
+  }
 </main>
  ```
 
@@ -122,15 +136,18 @@ output
     <span class="col2">mango</span>
   </div>
   <ul>
-    <li>item apple</li>
-    <li>item mango</li>
-    <li>item orange</li>
+    <li>apple</li>
+    <li>mango</li>
+    <li>orange</li>
   </ul>
   <ol>
     <li>item 1</li>
     <li>item 3</li>
     <li>item 5</li>
   </ol>
+  <p>if-true-0</p>         
+  <p>else-i-1</p>
+  <p>elseif-i-2</p>   
 </main>
 <div>
   <h1>hello stranger.</h1>
