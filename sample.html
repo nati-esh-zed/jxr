@@ -65,6 +65,17 @@
         {#ROW(bar)}
         {#ROW(bar.foo)}
         {#ROW(fruits)}
+        {#ROW(fruits[1])}
+        <ul>
+        {for fruit in fruits:
+            <li>item \{fruit\}</li>\{|nl\}
+        }
+        </ul>
+        <ol>
+        {for i in range(3,1,2):
+            <li>item \{i\}</li>
+        }
+        </ol>
     </main>
     </script>
     <script type="text/jxr" src="hello.jxr" async></script>

@@ -1,7 +1,7 @@
 
 /**
  * @name jxr
- * @version 1.1.3
+ * @version 1.2.5
  * @author Natnael Eshetu
  * @abstract Replaces script elements of type "text/jxr" 
  *           with the formatted html. 
@@ -29,7 +29,16 @@
  */
 
 let jxr = {
-    vars: {},
+    vars: {
+        range: function(count, start, step)
+        {
+            return { 
+                count: !!count ? count : 0, 
+                start: !!start ? start : 0, 
+                step:  !!step  ? step  : 1, 
+            };
+        }
+    },
     macros: {},
     process: function(script, shtml, script_src_, script_id_)
     {
@@ -124,7 +133,7 @@ let jxr = {
                 }
                 else if(script instanceof Object)
                 {
-                    script_id = script.script_id+'/Macro `'+script.name+'`';
+                    script_id = script.script_id+'/'+script.type+' `'+script.name+'`';
                     log_line_numbered_code = true;
                 }
             }
@@ -151,6 +160,7 @@ let jxr = {
                     return match_;
                 });
                 jxr.macros[name] = {
+                    type:       'macro',
                     script_id:  script_id,
                     script_src: script_src,
                     name:       name,
@@ -159,22 +169,24 @@ let jxr = {
                 };
                 return '';
             });
-            html  = shtml.replaceAll(/\{\s*((?:\\[}{]|.)*?)\s*\}/gs, function(match_, p1, offset)
+            html  = shtml.replaceAll(/\{\s*((?:\\[}{]|.)*?)\}/gs, function(match_, p1, offset)
             {
                 res_i  += offset - last_i;
                 last_i  = offset + match_.length;
                 let res = '';
                 const expr = p1;
+                const rstrmap = {
+                    '|nl':   "\n",
+                    '|tab':  "\t",
+                    'b/':    "{",
+                    '/b':    "}",
+                };
                 if(!expr || expr == '')
                 {
                 }
-                else if(expr == 'b/')
+                else if(rstrmap.hasOwnProperty(expr))
                 {
-                    res = '{';
-                }
-                else if(expr == '/b')
-                {
-                    res = '}';
+                    res = rstrmap[expr];
                 }
                 else if(expr == 'skip/')
                 {
@@ -192,7 +204,63 @@ let jxr = {
                         skip_start_i = null;
                     }
                 }
-                else if(expr.search(/#\s*(\w+)\s*\(\s*(.*?)\s*\)\s*/gs) != -1)
+                else if(expr.search(/^for\s+.*/gs) != -1)
+                {
+                    const rexpr   = expr.replaceAll(/\\([}{])/gs, '$1');
+                    const matches = /for (\w+)\s+in\s+(.*?)\s*\:(?:\s*\n|\s?)(.*?)(?:\s*\n\s*|\s*)$/gs.exec(rexpr);
+                    if(!!matches && matches.length >= 3)
+                    {
+                        const iname   = matches[1];
+                        const ivar    = eval(replace_value_vars(matches[2]));
+                        const icode   = matches[3];
+                        const itmp    = jxr.vars[iname];
+                        let cresult = '';
+                        if(!ivar)
+                            throw jxr_error('invalid for loop iterable variable!', shtml, offset, script_id, log_line_numbered_code);
+                        if(typeof ivar.start != 'undefined' 
+                        && typeof ivar.count != 'undefined'
+                        && typeof ivar.step != 'undefined'
+                        )
+                        {
+                            const start = ivar.start;
+                            const step  = ivar.step;
+                            const end   = start + ivar.count * step;
+                            for(let i = ivar.start; step > 0 ? (i < end) : (i > end); i += step)
+                            {
+                                jxr.vars[iname] = i;
+                                const result = jxr.process({
+                                    type: 'for-loop',
+                                    script_id: script_id,
+                                    script_src: script_src,
+                                    name: 'for',
+                                    body: rexpr,
+                                }, icode);
+                                cresult += result;
+                            }
+                        }
+                        else
+                        {
+                            for(let it of ivar)
+                            {
+                                jxr.vars[iname] = it;
+                                const result = jxr.process({
+                                    type: 'for-loop',
+                                    script_id: script_id,
+                                    script_src: script_src,
+                                    name: 'for',
+                                    body: rexpr,
+                                }, icode);
+                                cresult += result;
+                            }
+                        }
+                        if(itmp !== undefined)
+                            jxr.vars[iname] = itmp;
+                        res = cresult;
+                    }
+                    else 
+                        throw jxr_error('invalid for loop code!', shtml, offset, script_id, log_line_numbered_code);
+                }
+                else if(expr.search(/^#\s*\w+\s*\(\s*.*?\s*\)\s*/gs) != -1)
                 {
                     const matches = /\s*(\w+)\s*\(\s*(.*?)\s*\)\s*/gs.exec(expr);
                     const name    = matches[1];
@@ -226,14 +294,14 @@ let jxr = {
                 {
                     const r = /^\!(.*)$/gs;
                     const spexpr = r.exec(expr);
-                    const code   = spexpr[1];
+                    const code   = spexpr[1].replaceAll(/\\([}{])/gs, '$1');
                     eval(code);
                 }
                 else if(expr.search(/^\^.*$/gs) != -1)
                 {
                     const r = /^\^(.*)$/gs;
                     const spexpr = r.exec(expr);
-                    const code   = spexpr[1];
+                    const code   = spexpr[1].replaceAll(/\\([}{])/gs, '$1');
                     res = strvar(eval(code));
                 }
                 else if(expr.search(/^\s*[\w\.]+\s*=\s*.+\s*$/gs) != -1)
@@ -356,7 +424,6 @@ let jxr = {
                                 return p1;
                             else
                                 throw jxr_error('variable `'+p1+'` not defined.', shtml, offset, script_id, log_line_numbered_code);
-                                // throw EvalError('variable `'+p1+'` is not defined.');
                         }
                     });
                     res = strvar(eval(rexpr));
@@ -440,10 +507,6 @@ let jxr = {
         else if(script instanceof Object) // macro
         {
             return thtml;
-        }
-        else
-        {
-            console.log(thtml);
         }
         return thtml;
     }
