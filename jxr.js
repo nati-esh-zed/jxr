@@ -1,13 +1,12 @@
 
 /**
  * @name jxr
- * @version 1.0.0
+ * @version 1.1.3
  * @author Natnael Eshetu
  * @abstract Replaces script elements of type "text/jxr" 
  *           with the formatted html. 
  * @summary
- *  {...} -- }{ cannot exist inside {} unless it is in 
- *           string quotes or escaped with \.
+ *  {...} -- }{ cannot exist inside {} unless it is in string quotes.
  * 
  * @example
  * 
@@ -20,12 +19,6 @@
  *          {e:'default-dontset'}
  *          {document.title = 'hello'}
  *          {^document.title = 'hello'}
- *          {ext = \{ 
- *              "stype": "json", 
- *              "version": "1.0.0" 
- *              "valid": true, 
- *          \}}
- *          {data = [1,2,3,4]}
  *      {/skip}
  *          {!console.log('hello')}
  *          {document.title}
@@ -37,10 +30,13 @@
 
 let jxr = {
     vars: {},
-    process: function(script, shtml)
+    macros: {},
+    process: function(script, shtml, script_src_, script_id_)
     {
         let skip_indices = [];
         let html = null;
+        let script_id  = '';
+        let script_src = '';
         {
             const strvar = function(var_)
             {
@@ -56,7 +52,7 @@ let jxr = {
                     return JSON.stringify(var_);
                 return ''+var_;
             };
-            const jxr_error = function(err, shtml, offset, script_name, log_line_numbered_code)
+            const jxr_error = function(err, shtml, offset, script_id, log_line_numbered_code)
             {
                 const script_substr = shtml.substring(Math.max(offset-1, 0), Math.min(offset+name.length+3, shtml.length));
                 const line = (shtml.substring(0, offset+1).match(/\n/g) || []).length+1;
@@ -73,7 +69,7 @@ let jxr = {
                         return "\n"+pad+lstr+':';
                     }));
                 }
-                throw EvalError(err+' @'+script_name+':'+line+':'+offs+' -- `'+script_substr+'`');
+                return EvalError(err+' @'+script_id+':'+line+':'+offs+' -- `'+script_substr+'`');
             };
             const replace_value_vars = function(value)
             {
@@ -84,33 +80,85 @@ let jxr = {
                 }
                 else
                 {
-                    let rvalue = value.replaceAll(/\s*((['"])(?:\\\2|.)*?\2|[\w\.]+)\s*/gs, function(match_, p1, p2)
+                    let rvalue = value.replaceAll(/(?:(['"])(?:\\\1|.)*\1|([\w\.]+))/gs, function(match_, p1, p2)
                     {
-                        if(!p1 || p2 == '\'' || p2 == '"')
+                        if(!p2 || p2 == '\'' || p2 == '"')
                             return match_;
                         else if(match_ == 'null' || match_ == 'undefined')
                             return match_;
-                        else if(p1.indexOf('.') != -1)
+                        else if(p2.indexOf('.') != -1)
                         {
                             return eval(match_);
                         }
                         else
                         {
-                            if(jxr.vars.hasOwnProperty(p1))
-                                return 'jxr.vars.'+p1;
-                            else if(eval('!!'+p1))
-                                return p1;
+                            if(jxr.vars.hasOwnProperty(p2))
+                                return 'jxr.vars.'+p2;
+                            else if(eval('!!'+p2))
+                                return p2;
                             else
-                                throw EvalError('variable `'+p1+'` is not defined.');
+                                throw EvalError('variable `'+p2+'` is not defined.');
                         }
                     });
                     return rvalue;
                 }
             };
-            let skip_start_i = null;
-            let last_i       = 0;
-            let res_i        = 0;
+            let skip_start_i  = null;
+            let last_i        = 0;
+            let res_i         = 0;
+            let log_line_numbered_code = false;
+            if(!!script)
+            {
+                if(script instanceof HTMLScriptElement)
+                {
+                    const attr_id   = script.getAttribute('id') || script_id_;
+                    const attr_src  = script.getAttribute('src') || script_src_;
+                    if(!!attr_id)
+                        script_id =  attr_id;
+                    else if(!!attr_src)
+                    {
+                        script_id =  attr_src;
+                        script_src = attr_src;
+                    }
+                    log_line_numbered_code = !attr_src;
+                }
+                else if(script instanceof Object)
+                {
+                    script_id = script.script_id+'/Macro `'+script.name+'`';
+                    log_line_numbered_code = true;
+                }
+            }
+            // remove comments
             shtml = shtml.replaceAll(/\{\*(\\[}{]|.)*?\*\}/gs, '');
+            // process and remove macro definitions
+            shtml = shtml.replaceAll(/\{#\s*(\w+)\s*\(\s*((?:(?:\w+)\s*,?\s*)*)\s*\)(?:\s*\n|\s?)(.*?)(?:\n\s*|\s?)#\}/gs, function(match_, p1, p2, p3, offset)
+            {
+                const name   = p1;
+                if(typeof jxr.macros[name] !== 'undefined')
+                    throw jxr_error('Macro previously defined!', shtml, offset, script_id, log_line_numbered_code);
+                const params = p2.split(/\s*,\s*/gs);
+                const body   = p3.replaceAll(/\{\s*(?:(\w+)|#(\w+))?\s*\}/gs, function(match_, p1, p2)
+                {
+                    let pi = -1;
+                    if(!!p1 && (pi = params.indexOf(p1)) != -1)
+                    {
+                        return '{#'+p1+'}';
+                    }
+                    else if(!!p2 && (pi = params.indexOf(p2)) != -1)
+                    {
+                        return '{~'+p2+'}';
+                    }
+                    return match_;
+                });
+                jxr.macros[name] = {
+                    script_id:  script_id,
+                    script_src: script_src,
+                    name:       name,
+                    params:     params,
+                    body:       body
+                };
+                return '';
+            });
             html  = shtml.replaceAll(/\{\s*((?:\\[}{]|.)*?)\s*\}/gs, function(match_, p1, offset)
             {
                 res_i  += offset - last_i;
@@ -142,6 +190,36 @@ let jxr = {
                             end:    skip_end_i,
                         });
                         skip_start_i = null;
+                    }
+                }
+                else if(expr.search(/#\s*(\w+)\s*\(\s*(.*?)\s*\)\s*/gs) != -1)
+                {
+                    const matches = /\s*(\w+)\s*\(\s*(.*?)\s*\)\s*/gs.exec(expr);
+                    const name    = matches[1];
+                    const params  = matches[2].split(/\s*,\s*/gs);
+                    if(typeof jxr.macros[name] === 'undefined')
+                        throw jxr_error('Macro not defined!', shtml, offset, script_id, log_line_numbered_code);
+                    else
+                    {
+                        const macro  = jxr.macros[name];
+                        if(params.length !== macro.params.length)
+                            throw jxr_error('Macro params mismatch!', shtml, offset, script_id, log_line_numbered_code);
+                        const body   = macro.body.replaceAll(/\{(?:#(\w+)|~(\w+))\}/gs, function(match_, p1, p2)
+                        {
+                            if(!!p2)
+                            {
+                                const pi     = macro.params.indexOf(p2);
+                                const pname  = params[pi];
+                                return pname;
+                            }
+                            else
+                            {
+                                const pi   = macro.params.indexOf(p1);
+                                const pvar = '{'+params[pi]+'}';
+                                return pvar;
+                            }
+                        });
+                        res  = jxr.process(macro, body, script_src, script_id);
                     }
                 }
                 else if(expr.search(/^\!.*$/gs) != -1)
@@ -242,8 +320,7 @@ let jxr = {
                             rvar = rvar;
                         else 
                         {
-                            const script_name = !!script.getAttribute('name') ? script.getAttribute('name') : (!!script.getAttribute('src') ? script.getAttribute('src') : '');
-                            throw jxr_error('variable `'+name+'` is not defined!', shtml, offset, script_name, !script.getAttribute('src'));
+                            throw jxr_error('variable `'+name+'` is not defined!', shtml, offset, script_id, log_line_numbered_code);
                         }
                         for(let i = 1; i < ids.length; i++)
                         {
@@ -259,8 +336,7 @@ let jxr = {
                             res = strvar(eval(name));
                         else 
                         {
-                            const script_name = !!script.getAttribute('name') ? script.getAttribute('name') : (!!script.getAttribute('src') ? script.getAttribute('src') : '');
-                            throw jxr_error('variable `'+name+'` is not defined!', shtml, offset, script_name, !script.getAttribute('src'));
+                            throw jxr_error('variable `'+name+'` is not defined!', shtml, offset, script_id, log_line_numbered_code);
                         }
                     }
                 }
@@ -279,7 +355,8 @@ let jxr = {
                             else if(eval('typeof '+p1+' !== \'undefined\''))
                                 return p1;
                             else
-                                throw EvalError('variable `'+p1+'` is not defined.');
+                                throw jxr_error('variable `'+p1+'` not defined.', shtml, offset, script_id, log_line_numbered_code);
+                                // throw EvalError('variable `'+p1+'` is not defined.');
                         }
                     });
                     res = strvar(eval(rexpr));
@@ -318,11 +395,16 @@ let jxr = {
             }
         }
         // replace the script tag with the processed output
+        if(typeof script == 'string')
+        {
+            return thtml;
+        }
+        else if(script instanceof HTMLScriptElement)
         {
             let e =  null;
-            const r = RegExp('.*?<([a-zA-Z]+)(.*?)>(.*)<\/\\1.*?>.*?', 'gs');
+            const r = /^\s*<([a-zA-Z]+)(.*?)>(.*)<\/\1>\s*$/gs;
             rxhtml  = r.exec(thtml);
-            if(!!rxhtml && rxhtml.length > 2)
+            if(!!rxhtml && rxhtml.length >= 3)
             {
                 const tag         = rxhtml[1];
                 const tattributes = rxhtml[2];
@@ -349,14 +431,21 @@ let jxr = {
             else
             {
                 e = document.createElement('div');
-                for(let attr of script.attributes)
-                {
-                    e.setAttribute(attr.nodeName, attr.nodeValue);
-                }
+                if(!!script_id && script_id != '')
+                    e.setAttribute('id', script_id);
                 e.innerHTML = thtml;
             }
             script.replaceWith(e);
         }
+        else if(script instanceof Object) // macro
+        {
+            return thtml;
+        }
+        else
+        {
+            console.log(thtml);
+        }
+        return thtml;
     }
 };
 
@@ -367,22 +456,29 @@ document.addEventListener('DOMContentLoaded', function()
     for(let script of scripts)
     {
         script.removeAttribute('type');
-        let script_src = script.getAttribute('src');
+        const script_id  = script.getAttribute('id');
+        const script_src = script.getAttribute('src');
         if(!!script_src)
         {
-            const async = script.getAttribute('async') != 'false' || script.hasAttribute('async');
+            const attr_async = script.getAttribute('async');
+            const async = !attr_async || attr_async != 'false';
             let xhr = new XMLHttpRequest();
+            xhr.data = {
+                script:     script,
+                script_src: script_src,
+                script_id:  script_id,
+            };
             xhr.open("GET", script_src, async);
             xhr.onload = function () 
             {
-                if(this.readyState === XMLHttpRequest.DONE && xhr.status === 200) 
+                if(this.readyState === XMLHttpRequest.DONE && this.status === 200) 
                 {
                     shtml = this.responseText;
                     script.removeAttribute('src');
-                    jxr.process(script, this.responseText);
+                    jxr.process(this.data.script, shtml, this.data.script_src, this.data.script_id_);
                 }
                 else
-                    console.error('failed to fetch script `'+script_src+'`');
+                    console.error('failed to fetch script `'+this.data.script_src+'`');
             };
             xhr.send();
         }

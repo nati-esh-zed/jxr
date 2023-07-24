@@ -30,76 +30,46 @@
     <script src="jxr.js"></script>
 </head>
 <body>
-    <script type="text/jxr">
+    <script type="text/jxr" id="index-0">
     <main>
         {skip/}
+            {#ROW (varid) 
+                <{tag} {attr}>
+                    <{tag1} {attr1}>{#varid}</{tag1}>
+                    <{tag1} {attr2}>{varid}</{tag1}>
+                </{tag}>
+            #}
             { tag       = 'div' }
             { tag1      = 'span' }
             { attr      = 'class="row"' }
             { attr1     = 'class="col1"' }
             { attr2     = 'class="col2"' }
-            { separator = ' ' }
             { o         = null }
-            { bar       = \{ "foo": "foo in bar" \} }
-            { fruits    = [ 'apple', 'mango', 'orange' ] }
             { a         = 2 }
             { b         = Math.PI }
             { c         = a + b }
+            { bar       = \{ "foo": "foo in bar" \} }
+            { fruits    = [ 'apple', 'mango', 'orange' ] }
         {/skip}
-        <{tag} {attr}>
-            <{tag1} {attr1}>Math.PI {separator}</{tag1}>
-            <{tag1} {attr2}>{Math.PI}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>a {separator}</{tag1}>
-            <{tag1} {attr2}>{a}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>b {separator}</{tag1}>
-            <{tag1} {attr2}>{b}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>c {separator}</{tag1}>
-            <{tag1} {attr2}>{c}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>d?'default-set' {separator}</{tag1}>
-            <{tag1} {attr2}>{d?'default-set'}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>e:'default-dontset' {separator}</{tag1}>
-            <{tag1} {attr2}>{e:'default-dontset'}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>d {separator}</{tag1}>
-            <{tag1} {attr2}>{d:'undefined'}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>e {separator}</{tag1}>
-            <{tag1} {attr2}>{e:'undefined'}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>document.title = 'hello'  {separator}</{tag1}>
-            <{tag1} {attr2}>{document.title = 'hello'}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>^document.title = 'hello' {separator}</{tag1}>
-            <{tag1} {attr2}>{^document.title = 'hello'}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>bar {separator}</{tag1}>
-            <{tag1} {attr2}>{bar}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>bar {separator}</{tag1}>
-            <{tag1} {attr2}>{bar.foo}</{tag1}>
-        </{tag}>
-        <{tag} {attr}>
-            <{tag1} {attr1}>fruits {separator}</{tag1}>
-            <{tag1} {attr2}>{fruits}</{tag1}>
-        </{tag}>
+        {#ROW(Math.PI)}
+        {#ROW(o)}
+        {#ROW(a)}
+        {#ROW(b)}
+        {#ROW(c)}
+        {#ROW(d?'default-set')}
+        {#ROW(e:'default-dontset')}
+        {#ROW(d)}
+        {#ROW(e:)}
+        {#ROW(document.title = 'hello')}
+        {#ROW(document.title = 'hello')}
+        {#ROW(bar)}
+        {#ROW(bar.foo)}
+        {#ROW(fruits)}
     </main>
     </script>
     <script type="text/jxr" src="hello.jxr" async></script>
+    <script type="text/jxr" id="index-1">
+        put inside a div with parent script.id
+    </script>
 </body>
 </html>
