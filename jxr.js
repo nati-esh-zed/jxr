@@ -1,7 +1,7 @@
 
 /**
  * @name jxr
- * @version 1.4.10
+ * @version 1.5.13
  * @author Natnael Eshetu
  * @abstract Replaces script elements of type "text/jxr" 
  *           with the formatted html. 
@@ -586,14 +586,8 @@ let jxr = {
             return thtml;
         }
         return thtml;
-    }
-};
-
-
-document.addEventListener('DOMContentLoaded', function()
-{
-    let scripts = document.querySelectorAll('script[type="text/jxr"]');
-    for(let script of scripts)
+    },
+    update: function(script)
     {
         script.removeAttribute('type');
         const script_id  = script.getAttribute('id');
@@ -626,6 +620,58 @@ document.addEventListener('DOMContentLoaded', function()
         {
             jxr.process(script, script.innerHTML);
         }
-        
+    },
+    update_all: function(target)
+    {
+        target = !!target ? target : document;
+        let scripts = target.querySelectorAll('script[type="text/jxr"]');
+        for(let script of scripts)
+        {
+            jxr.update(script);
+        }
+    },
+    observer: null,
+    observe: function()
+    {
+        if(!jxr.observer)
+        {
+            const config = { 
+                childList: true, 
+                subtree: true 
+            };
+            const callback = function(mutation_list, observer) 
+            {
+                for(const mutation of mutation_list) 
+                {
+                    if(mutation.target.tagName == 'SCRIPT'
+                    && mutation.target.getAttribute('type') == 'text/jxr')
+                    {
+                        observer.jxr.update(mutation.target);
+                    }
+                    else
+                    {
+                        let jxr_scripts = mutation.target.querySelectorAll('script[type="text/jxr"]');
+                        if(jxr_scripts && jxr_scripts.length > 0)
+                        {
+                            for(let jxr_script of jxr_scripts)
+                                observer.jxr.update(jxr_script);
+                        }
+                    }
+                }
+            };
+            jxr.observer     = new MutationObserver(callback);
+            jxr.observer.jxr = jxr;
+            jxr.observer.observe(document, config);
+        }
+    },
+    stop: function()
+    {
+        if(!!jxr.observer)
+        {
+            jxr.observer.disconnect();
+            jxr.observer = null;
+        }
     }
-});
+};
+
+document.addEventListener('DOMContentLoaded', function(){ jxr.update_all(); });
