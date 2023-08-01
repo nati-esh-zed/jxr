@@ -1,7 +1,7 @@
 
 /**
  * @name jxr
- * @version 1.5.13
+ * @version 1.5.15
  * @author Natnael Eshetu
  * @abstract Replaces script elements of type "text/jxr" 
  *           with the formatted html. 
@@ -580,6 +580,23 @@ let jxr = {
                 e.innerHTML = thtml;
             }
             __script.replaceWith(e);
+            // activate javascript scripts
+            if(!!e.querySelectorAll)
+            {
+                let target_scripts = e.getElementsByTagName('SCRIPT');
+                for(let target_script of target_scripts)
+                {
+                    const attr_type = target_script.getAttribute('type');
+                    if(!attr_type || attr_type == 'text/javascript')
+                    {
+                        let new_script = document.createElement("script");
+                        for(let attr of target_script.attributes)
+                            new_script.setAttribute(attr.name, attr.value);
+                        new_script.innerHTML = target_script.innerHTML;
+                        target_script.replaceWith(new_script);
+                    }
+                }
+            }
         }
         else if(__script instanceof Object) // __macro
         {
